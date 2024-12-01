@@ -1,9 +1,9 @@
-FROM alpine:3.5
+FROM alpine:3.20
 # alpine:latest
 
 MAINTAINER Leon.Xu ( http://github.com/kairyou/ )
 
-ENV TENGINE_VERSION 2.2.2
+ENV TENGINE_VERSION 3.1.0
 
 # nginx: https://git.io/vSIyj
 
@@ -35,22 +35,25 @@ ENV CONFIG "\
 	--with-http_secure_link_module \
 	--with-http_stub_status_module \
 	--with-http_auth_request_module \
-	--with-http_xslt_module=shared \
-	--with-http_image_filter_module=shared \
-	--with-http_geoip_module=shared \
+	--with-http_xslt_module \
+	--with-http_image_filter_module \
+	--with-http_geoip_module \
 	--with-threads \
 	--with-http_slice_module \
 	--with-mail \
 	--with-mail_ssl_module \
 	--with-file-aio \
 	--with-http_v2_module \
-	--with-http_concat_module \
-	--with-http_sysguard_module \
-	--with-http_dyups_module \
+	--add-module=./modules/ngx_http_concat_module \
+	--add-module=./modules/ngx_http_sysguard_module \
+	--add-module=./modules/ngx_http_upstream_check_module \
+	--add-module=./modules/ngx_http_upstream_dyups_module \
+	--add-module=./modules/ngx_http_proxy_connect_module \
 	"
 
 RUN addgroup -S nginx \
 	&& adduser -D -S -h /var/cache/nginx -s /sbin/nologin -G nginx nginx \
+	&& sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories \
 	&& apk add --no-cache --virtual .build-deps \
 		gcc \
 		libc-dev \
@@ -64,6 +67,9 @@ RUN addgroup -S nginx \
 		libxslt-dev \
 		gd-dev \
 		geoip-dev;
+
+
+# static 编译，去掉了 strip: '/etc/nginx/modules/*.so' 处理
 RUN curl -L "http://tengine.taobao.org/download/tengine-$TENGINE_VERSION.tar.gz" -o tengine.tar.gz \
 	&& mkdir -p /usr/src \
   && tar -zxC /usr/src -f tengine.tar.gz \
@@ -82,7 +88,6 @@ RUN curl -L "http://tengine.taobao.org/download/tengine-$TENGINE_VERSION.tar.gz"
 	&& install -m644 html/50x.html /usr/share/nginx/html/ \
 	&& install -m755 objs/nginx-debug /usr/sbin/nginx-debug \
 	&& strip /usr/sbin/nginx* \
-	&& strip /etc/nginx/modules/*.so \
 	&& rm -rf /usr/src/tengine-$TENGINE_VERSION \
 	\
 	# Bring in gettext so we can get `envsubst`, then throw
